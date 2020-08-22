@@ -4,6 +4,7 @@ use bevy_ecs::Bundle;
 use bevy_render::{
     draw::Draw,
     mesh::Mesh,
+    gltf_scene::GltfScene,
     pipeline::{DynamicBinding, PipelineSpecialization, RenderPipeline, RenderPipelines},
     render_graph::base::MainPass,
 };
@@ -13,6 +14,7 @@ use bevy_transform::prelude::{Rotation, Scale, Transform, Translation};
 #[derive(Bundle)]
 pub struct PbrComponents {
     pub mesh: Handle<Mesh>,
+    pub gltf_scene: Handle<GltfScene>,
     pub material: Handle<StandardMaterial>,
     pub main_pass: MainPass,
     pub draw: Draw,
@@ -45,6 +47,7 @@ impl Default for PbrComponents {
                 },
             )]),
             mesh: Default::default(),
+            gltf_scene: Default::default(),
             material: Default::default(),
             main_pass: Default::default(),
             draw: Default::default(),

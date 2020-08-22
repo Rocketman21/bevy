@@ -9,6 +9,7 @@ pub mod render_graph;
 pub mod renderer;
 pub mod shader;
 pub mod texture;
+pub mod gltf_scene;
 
 mod entity;
 pub use once_cell;
@@ -50,6 +51,7 @@ use texture::HdrTextureLoader;
 #[cfg(feature = "png")]
 use texture::ImageTextureLoader;
 use texture::TextureResourceSystemState;
+use gltf_scene::GltfScene;
 
 /// The names of "render" App stages
 pub mod stage {
@@ -94,6 +96,7 @@ impl Plugin for RenderPlugin {
             .add_stage_after(stage::DRAW, stage::RENDER)
             .add_stage_after(stage::RENDER, stage::POST_RENDER)
             .add_asset::<Mesh>()
+            .add_asset::<GltfScene>()
             .add_asset::<Texture>()
             .add_asset::<Shader>()
             .add_asset::<PipelineDescriptor>()
@@ -142,6 +145,10 @@ impl Plugin for RenderPlugin {
             .add_system_to_stage(
                 stage::RENDER_RESOURCE,
                 mesh::mesh_resource_provider_system.system(),
+            )
+            .add_system_to_stage(
+                stage::RENDER_RESOURCE,
+                gltf_scene::gttf_scene_resource_provider_system.system(),
             )
             .add_system_to_stage(
                 stage::RENDER_RESOURCE,

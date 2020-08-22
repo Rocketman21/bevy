@@ -1,6 +1,7 @@
 use bevy_render::{
     mesh::{Mesh, VertexAttribute},
     pipeline::PrimitiveTopology,
+    gltf_scene::GltfScene,
 };
 
 use anyhow::Result;
@@ -15,10 +16,10 @@ use thiserror::Error;
 #[derive(Default)]
 pub struct GltfLoader;
 
-impl AssetLoader<Mesh> for GltfLoader {
-    fn from_bytes(&self, asset_path: &Path, bytes: Vec<u8>) -> Result<Mesh> {
-        let mesh = load_gltf(asset_path, bytes)?;
-        Ok(mesh)
+impl AssetLoader<GltfScene> for GltfLoader {
+    fn from_bytes(&self, asset_path: &Path, bytes: Vec<u8>) -> Result<GltfScene> {
+        let gltf_scene = load_gltf(asset_path, bytes)?;
+        Ok(gltf_scene)
     }
 
     fn extensions(&self) -> &[&str] {
@@ -55,23 +56,34 @@ fn get_primitive_topology(mode: Mode) -> Result<PrimitiveTopology, GltfError> {
     }
 }
 
-// TODO: this should return a scene
-pub fn load_gltf(asset_path: &Path, bytes: Vec<u8>) -> Result<Mesh, GltfError> {
+pub fn load_gltf(asset_path: &Path, bytes: Vec<u8>) -> Result<GltfScene, GltfError> {
     let gltf = gltf::Gltf::from_slice(&bytes)?;
     let buffer_data = load_buffers(gltf.buffers(), asset_path)?;
+    let mut meshes = Vec::new();
+
     for scene in gltf.scenes() {
-        if let Some(node) = scene.nodes().next() {
-            return Ok(load_node(&buffer_data, &node, 1)?);
+        for node in scene.nodes() {
+            if let Ok(mesh) = load_node(&buffer_data, &node) {
+                meshes.extend(mesh);
+            }
         }
     }
 
-    // TODO: remove this when full gltf support is added
-    panic!("no mesh found!")
+    if meshes.len() == 0 {
+        // TODO: remove this when full gltf support is added
+        panic!("no mesh found!");
+    }
+
+    println!("Meshes {}", &meshes.len());
+
+    Ok(GltfScene { meshes })
 }
 
-fn load_node(buffer_data: &[Vec<u8>], node: &gltf::Node, depth: i32) -> Result<Mesh, GltfError> {
+fn load_node(buffer_data: &[Vec<u8>], node: &gltf::Node) -> Result<Vec<Mesh>, GltfError> {
+    let mut meshes = Vec::new();
+
     if let Some(mesh) = node.mesh() {
-        if let Some(primitive) = mesh.primitives().next() {
+        for primitive in mesh.primitives() {
             let reader = primitive.reader(|buffer| Some(&buffer_data[buffer.index()]));
             let primitive_topology = get_primitive_topology(primitive.mode())?;
             let mut mesh = Mesh::new(primitive_topology);
@@ -101,15 +113,21 @@ fn load_node(buffer_data: &[Vec<u8>], node: &gltf::Node, depth: i32) -> Result<M
                 mesh.indices = Some(indices.into_u32().collect::<Vec<u32>>());
             };
 
-            return Ok(mesh);
+            meshes.push(mesh);
         }
     }
 
-    if let Some(child) = node.children().next() {
-        return Ok(load_node(buffer_data, &child, depth + 1)?);
+    for child in node.children() {
+        if let Ok(child_meshes) = load_node(buffer_data, &child) {
+            meshes.extend(child_meshes);
+        }
     }
 
-    panic!("failed to find mesh")
+    if meshes.len() == 0 {
+        panic!("failed to find mesh");
+    }
+
+    Ok(meshes)
 }
 
 fn load_buffers(buffers: iter::Buffers, asset_path: &Path) -> Result<Vec<Vec<u8>>, GltfError> {
